@@ -1,19 +1,26 @@
 {
   "version": "2.0",
-  "envId": "user-story", 
-  "functionRoot": "cloudfunctions",
+  "envId": "user-story-d5g7zl0p2cf3a451a",
   "functions": [
     {
       "name": "user-story-api",
       "runtime": "Python3.9",
       "handler": "main.handler",
-      "timeout": 60,  
+      "timeout": 60,
       "memorySize": 512,
       "installDependency": true,
+      "useDocker": false,
       "envVariables": {
+        "PYTHONPATH": ".",
         "DEEPSEEK_API_KEY": "sk-50670166a5ba400f855f40145f63102f",
-        "PYTHONPATH": "."
+        "DATABASE_URL": ""
       }
     }
-  ]
+  ],
+  "app": {
+    "serviceName": "UserStoryLLM",
+    "installCommand": "",
+    "buildCommand": "",
+    "outputDir": "./"
+  }
 }
