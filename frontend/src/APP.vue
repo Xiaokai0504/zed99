@@ -436,6 +436,19 @@ export default {
     }
   },
   methods: {
+    getApiBaseURL() {
+      const configuredBaseURL = (process.env.VUE_APP_API_URL || '').trim()
+      const cloudBaseURL = (process.env.VUE_APP_CLOUDBASE_API_URL || '').trim()
+      const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+      const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1'
+
+      if (!isLocalHost && cloudBaseURL) {
+        return cloudBaseURL.replace(/\/$/, '')
+      }
+
+      return configuredBaseURL.replace(/\/$/, '')
+    },
+
     async request(url, method = 'GET', body = null) {
       const options = {
         method,
@@ -447,8 +460,7 @@ export default {
         options.body = JSON.stringify(body)
       }
 
-      // 修正：从环境变量获取 baseURL
-      const baseURL = process.env.VUE_APP_API_URL || ''
+      const baseURL = this.getApiBaseURL()
       const response = await fetch(`${baseURL}${url}`, options)
       
       const data = await response.json()
