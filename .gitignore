@@ -16,3 +16,11 @@ dist/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+*.log

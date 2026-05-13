@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: user-story-generator
+    runtime: python
+    region: singapore
+    plan: free
+    buildCommand: |
+      npm install
+      npm run build
+      pip install -r requirements.txt
+    startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    autoDeploy: true
+
+databases:
+  - name: user-story-db
+    engine: postgresql
+    region: singapore
+    plan: free
+    ipAllowList: []

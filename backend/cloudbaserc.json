@@ -1,0 +1,19 @@
+{
+  "version": "2.0",
+  "envId": "user-story", 
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    {
+      "name": "user-story-api",
+      "runtime": "Python3.9",
+      "handler": "main.handler",
+      "timeout": 60,  
+      "memorySize": 512,
+      "installDependency": true,
+      "envVariables": {
+        "DEEPSEEK_API_KEY": "sk-50670166a5ba400f855f40145f63102f",
+        "PYTHONPATH": "."
+      }
+    }
+  ]
+}

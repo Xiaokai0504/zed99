@@ -466,8 +466,9 @@ export default {
         options.body = JSON.stringify(body)
       }
 
-      const response = await fetch(`http://127.0.0.1:8000${url}`, options)
-      const data = await response.json()
+     const baseURL = process.env.VUE_APP_API_URL || ''
+    const response = await fetch(`${baseURL}${url}`, options)
+    const data = await response.json()
 
       if (!response.ok) {
         throw new Error(data.message || '请求失败')

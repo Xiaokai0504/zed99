@@ -1,7 +1,9 @@
 fastapi
 uvicorn
+gunicorn
 openai
 pandas
 python-dotenv
-uvicorn main:app --reload
 sqlalchemy
+psycopg2-binary
+python-multipart
