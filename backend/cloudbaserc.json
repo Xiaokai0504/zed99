@@ -4,23 +4,14 @@
   "functions": [
     {
       "name": "user-story-api",
+      "type": "HTTP",
       "runtime": "Python3.9",
       "handler": "main.handler",
-      "timeout": 60,
-      "memorySize": 512,
+      "timeout": 120,
+      "memorySize": 1024,
       "installDependency": true,
       "useDocker": false,
-      "envVariables": {
-        "PYTHONPATH": ".",
-        "DEEPSEEK_API_KEY": "sk-50670166a5ba400f855f40145f63102f",
-        "DATABASE_URL": ""
-      }
+      "envVariables": {}
     }
-  ],
-  "app": {
-    "serviceName": "UserStoryLLM",
-    "installCommand": "",
-    "buildCommand": "",
-    "outputDir": "./"
-  }
+  ]
 }

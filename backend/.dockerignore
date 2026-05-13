@@ -1,0 +1,15 @@
+.env
+*.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+.git/
+.gitignore
+cloudbaserc.json
+logs/
+*.log
+*.tmp
+*.temp

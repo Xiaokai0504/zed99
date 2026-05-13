@@ -1,0 +1,4 @@
+#!/bin/bash
+export PORT=9000
+# 必须使用 uvicorn 拉起服务，监听 9000 端口
+/var/lang/python3.9/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 9000

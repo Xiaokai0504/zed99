@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
 from typing import Any, Dict, List
 from fastapi import FastAPI
@@ -6,22 +9,9 @@ from pydantic import BaseModel, Field
 from llm_module import generate_structured_data, extract_requirement_from_code
 from kb_module import get_enhanced_context
 from evaluation_module import evaluate_result
-from mangum import Mangum  # 新增：导入Serverless适配器
+from mangum import Mangum
 
-# 数据库知识库相关模块
-try:
-    from database import Base, engine, SessionLocal
-    from knowledge_models import KnowledgeModule
-    from seed_common_knowledge import seed_common_knowledge
-    DATABASE_AVAILABLE = True
-except Exception:
-    Base = None
-    engine = None
-    SessionLocal = None
-    KnowledgeModule = None
-    DATABASE_AVAILABLE = False
-
-# 用户故事相关代码生成模块
+# 代码生成模块（可选，保留）
 try:
     from code_module import generate_related_code
     CODE_GENERATION_AVAILABLE = True
@@ -30,22 +20,19 @@ except Exception:
     CODE_GENERATION_AVAILABLE = False
 
 app = FastAPI(
-    title="智能用户故事生成系统",
-    description="基于大语言模型与数据库知识库的需求解析、用户故事生成、任务拆解、代码生成与实验评估系统",
+    title="智能用户故事生成系统（无数据库版）",
+    description="基于大语言模型的需求解析、用户故事生成、任务拆解、代码生成与实验评估系统",
     version="2.0.0",
-    root_path="/api"  # 新增：匹配EdgeOne反向代理路径前缀
+    root_path="/api"  # <--- 必须保留或加回这一行
 )
 
-# 配置CORS（通过EdgeOne反向代理后可直接注释掉，彻底避免跨域）
+# 配置CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 移除：静态文件挂载（前端单独部署到EdgeOne）
-# app.mount("/", StaticFiles(directory="dist", html=True), name="static")
 
 class RequirementRequest(BaseModel):
     requirement: str = Field(..., description="单条自然语言需求文本")
@@ -55,17 +42,6 @@ class BatchRequirementRequest(BaseModel):
 
 class CodeRequirementRequest(BaseModel):
     code: str = Field(..., description="代码文本（支持多语言，建议单段完整代码）")
-
-class KnowledgeModuleRequest(BaseModel):
-    module_name: str = Field(..., description="知识模块名称")
-    category: str = Field("通用软件模块", description="模块分类")
-    aliases: List[str] = Field(default_factory=list, description="模块别名")
-    required_elements: List[str] = Field(default_factory=list, description="必选要素")
-    preconditions: List[str] = Field(default_factory=list, description="前置条件")
-    exception_scenarios: List[str] = Field(default_factory=list, description="异常场景")
-    typical_tasks: List[str] = Field(default_factory=list, description="典型任务")
-    security_constraints: str = Field("", description="安全约束")
-    description: str = Field("", description="模块说明")
 
 class CodeGenerateRequest(BaseModel):
     requirement: str = Field("", description="原始自然语言需求")
@@ -86,102 +62,17 @@ def error_response(message: str = "操作失败", data: Any = None) -> Dict[str,
         "data": data
     }
 
-def dumps_list(value: List[str]) -> str:
-    return json.dumps(value or [], ensure_ascii=False)
-
-def loads_list(value: str) -> List[str]:
-    try:
-        data = json.loads(value or "[]")
-        return data if isinstance(data, list) else []
-    except Exception:
-        return []
-
-def knowledge_row_to_dict(row: Any) -> Dict[str, Any]:
-    return {
-        "id": row.id,
-        "module_name": row.module_name,
-        "category": row.category,
-        "aliases": loads_list(row.aliases),
-        "required_elements": loads_list(row.required_elements),
-        "preconditions": loads_list(row.preconditions),
-        "exception_scenarios": loads_list(row.exception_scenarios),
-        "typical_tasks": loads_list(row.typical_tasks),
-        "security_constraints": row.security_constraints or "",
-        "description": row.description or "",
-        "is_builtin": row.is_builtin
-    }
-
-@app.on_event("startup")
-def startup_event():
-    """系统启动时初始化数据库表结构"""
-    if DATABASE_AVAILABLE:
-        Base.metadata.create_all(bind=engine)
-
 @app.get("/health")
 def health_check():
     return success_response(
         {
             "service": "智能用户故事生成系统后端",
             "status": "running",
-            "database_available": DATABASE_AVAILABLE,
+            "database_available": False,
             "code_generation_available": CODE_GENERATION_AVAILABLE
         },
         "服务运行正常"
     )
-
-@app.get("/knowledge_modules")
-def list_knowledge_modules():
-    if not DATABASE_AVAILABLE:
-        return error_response("数据库知识库模块未启用，请检查 database.py、knowledge_models.py 和 seed_common_knowledge.py")
-    db = SessionLocal()
-    try:
-        rows = db.query(KnowledgeModule).order_by(KnowledgeModule.id.asc()).all()
-        modules = [knowledge_row_to_dict(row) for row in rows]
-        return success_response(
-            {
-                "total": len(modules),
-                "modules": modules
-            },
-            "知识库模块查询成功"
-        )
-    finally:
-        db.close()
-
-@app.post("/knowledge_modules")
-def create_knowledge_module(req: KnowledgeModuleRequest):
-    if not DATABASE_AVAILABLE:
-        return error_response("数据库知识库模块未启用，请检查 database.py、knowledge_models.py 和 seed_common_knowledge.py")
-    module_name = req.module_name.strip()
-    if not module_name:
-        return error_response("模块名称不能为空")
-    db = SessionLocal()
-    try:
-        exists = db.query(KnowledgeModule).filter(
-            KnowledgeModule.module_name == module_name
-        ).first()
-        if exists:
-            return error_response("该知识模块已存在")
-        module = KnowledgeModule(
-            module_name=module_name,
-            category=req.category.strip() or "通用软件模块",
-            aliases=dumps_list(req.aliases),
-            required_elements=dumps_list(req.required_elements),
-            preconditions=dumps_list(req.preconditions),
-            exception_scenarios=dumps_list(req.exception_scenarios),
-            typical_tasks=dumps_list(req.typical_tasks),
-            security_constraints=req.security_constraints.strip(),
-            description=req.description.strip(),
-            is_builtin=False
-        )
-        db.add(module)
-        db.commit()
-        db.refresh(module)
-        return success_response(
-            knowledge_row_to_dict(module),
-            "知识库模块新增成功"
-        )
-    finally:
-        db.close()
 
 @app.post("/preview_context")
 def preview_context(req: RequirementRequest):
@@ -374,5 +265,8 @@ def generate_code_endpoint(req: CodeGenerateRequest):
     except Exception as e:
         return error_response(f"代码生成接口异常: {str(e)}")
 
-# 新增：CloudBase云函数入口
-handler = Mangum(app)
+# CloudBase云函数入口
+def handler(event, context):
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
+    return handler(event, context)

@@ -1,17 +1,10 @@
-# seed_common_knowledge.py
-"""
-数据库知识库初始化脚本。
-运行方式：python seed_common_knowledge.py
-作用：创建 knowledge_module 表，并写入/更新通用软件业务知识模块。
-"""
+# kb_module.py - 无数据库版，内置静态通用知识库
 import json
-from typing import Dict, List
+import re
+from typing import Dict, List, Any
 
-from database import Base, engine, SessionLocal
-from knowledge_models import KnowledgeModule
-
-
-COMMON_KNOWLEDGE_MODULES: List[Dict] = [
+# 直接内置原数据库中的所有通用知识库（36个模块）
+COMMON_KNOWLEDGE = [
     # 一、安全认证与用户体系
     {
         "module_name": "登录",
@@ -83,7 +76,6 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
         "typical_tasks": ["设计个人中心页面", "实现个人信息查询接口", "实现个人信息修改接口", "设计用户扩展信息表"],
         "security_constraints": "个人敏感信息展示应做脱敏处理"
     },
-
     # 二、电商交易类
     {
         "module_name": "商品管理",
@@ -165,7 +157,6 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
         "typical_tasks": ["设计售后申请页面", "实现售后接口", "设计售后记录表", "实现退款状态流转"],
         "security_constraints": "退款金额需与订单金额进行一致性校验"
     },
-
     # 三、内容互动与消息
     {
         "module_name": "搜索",
@@ -217,7 +208,6 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
         "typical_tasks": ["设计收藏按钮", "实现收藏接口", "设计收藏关系表", "实现收藏状态查询"],
         "security_constraints": "收藏关系必须与当前登录用户绑定"
     },
-
     # 四、后台管理与组织流程
     {
         "module_name": "内容管理",
@@ -279,7 +269,6 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
         "typical_tasks": ["设计工单页面", "实现工单创建接口", "设计工单表", "实现工单状态更新"],
         "security_constraints": "用户只能查看自己提交或被分配的工单"
     },
-
     # 五、数据统计与导入导出
     {
         "module_name": "报表统计",
@@ -311,7 +300,6 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
         "typical_tasks": ["设计导入按钮", "实现文件解析接口", "设计导入记录表", "实现错误明细反馈"],
         "security_constraints": "导入文件需校验类型和大小，避免恶意文件上传"
     },
-
     # 六、教育、预约、医疗、政务等常见业务
     {
         "module_name": "课程学习",
@@ -363,7 +351,6 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
         "typical_tasks": ["设计申报页面", "实现材料上传接口", "设计申报记录表", "实现状态流转"],
         "security_constraints": "政务材料涉及个人信息，需进行访问控制和审计"
     },
-
     # 七、运维集成与安全审计
     {
         "module_name": "日志审计",
@@ -407,51 +394,62 @@ COMMON_KNOWLEDGE_MODULES: List[Dict] = [
     }
 ]
 
+STOP_WORDS = ["类", "模块", "功能", "系统", "业务", "需求", "相关", "场景"]
 
-def dumps_list(value):
-    return json.dumps(value or [], ensure_ascii=False)
+def normalize_text(text: str) -> str:
+    """对输入文本做简单清洗，减少“xx类”“xx模块”对匹配的影响。"""
+    text = str(text or "").strip().lower()
+    text = re.sub(r"\s+", "", text)
+    for word in STOP_WORDS:
+        text = text.replace(word, "")
+    return text
 
+def keyword_hit(requirement: str, keyword: str) -> bool:
+    """同时使用原文本和归一化文本做包含匹配。"""
+    if not keyword:
+        return False
+    raw_requirement = str(requirement or "")
+    raw_keyword = str(keyword or "")
+    if raw_keyword in raw_requirement:
+        return True
+    normalized_requirement = normalize_text(raw_requirement)
+    normalized_keyword = normalize_text(raw_keyword)
+    return bool(normalized_keyword and normalized_keyword in normalized_requirement)
 
-def seed_common_knowledge():
-    """
-    初始化或更新数据库知识库。
-    若模块已存在，则更新其内容；若不存在，则插入新记录。
-    """
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
+def extract_matches(requirement: str, knowledge_data: List[Dict]) -> List[Dict[str, Any]]:
+    """根据模块名和别名匹配知识库。"""
+    matched_modules = []
+    matched_names = set()
+    for module in knowledge_data:
+        aliases = module.get("aliases", [])
+        keywords = [module["module_name"]] + aliases
+        for keyword in keywords:
+            if keyword_hit(requirement, keyword):
+                if module["module_name"] not in matched_names:
+                    matched_modules.append({"module": module["module_name"], "rules": module})
+                    matched_names.add(module["module_name"])
+                break
+    return matched_modules
 
-    try:
-        insert_count = 0
-        update_count = 0
+def format_context(module_name: str, rules: Dict[str, Any]) -> str:
+    required_elements = "、".join(rules.get("required_elements", [])) or "无"
+    preconditions = "、".join(rules.get("preconditions", [])) or "无"
+    exceptions = "、".join(rules.get("exception_scenarios", [])) or "无"
+    templates = "、".join(rules.get("typical_tasks", [])) or "无"
+    security_constraints = rules.get("security_constraints", "无特殊安全约束")
+    return (
+        f"【模块】{module_name}\n"
+        f"【必选要素】{required_elements}\n"
+        f"【前置条件】{preconditions}\n"
+        f"【异常场景】{exceptions}\n"
+        f"【典型任务】{templates}\n"
+        f"【安全约束】{security_constraints}"
+    )
 
-        for item in COMMON_KNOWLEDGE_MODULES:
-            module_name = item["module_name"]
-            row = db.query(KnowledgeModule).filter(
-                KnowledgeModule.module_name == module_name
-            ).first()
-
-            if row is None:
-                row = KnowledgeModule(module_name=module_name)
-                db.add(row)
-                insert_count += 1
-            else:
-                update_count += 1
-
-            row.category = item.get("category", "通用软件模块")
-            row.aliases = dumps_list(item.get("aliases"))
-            row.required_elements = dumps_list(item.get("required_elements"))
-            row.preconditions = dumps_list(item.get("preconditions"))
-            row.exception_scenarios = dumps_list(item.get("exception_scenarios"))
-            row.typical_tasks = dumps_list(item.get("typical_tasks"))
-            row.security_constraints = item.get("security_constraints", "")
-            row.description = item.get("description", "")
-            row.is_builtin = True
-
-        db.commit()
-        print(f"通用知识库初始化完成：新增 {insert_count} 条，更新 {update_count} 条，总计 {len(COMMON_KNOWLEDGE_MODULES)} 条。")
-    finally:
-        db.close()
-
-
-if __name__ == "__main__":
-    seed_common_knowledge()
+def get_enhanced_context(requirement: str) -> str:
+    """获取知识增强上下文（无数据库版）"""
+    matched_modules = extract_matches(requirement, COMMON_KNOWLEDGE)
+    if not matched_modules:
+        return "当前需求未命中专用知识库，请仅基于通用软件工程知识进行需求解析和任务拆解。"
+    context_blocks = [format_context(item["module"], item["rules"]) for item in matched_modules]
+    return "\n\n".join(context_blocks)

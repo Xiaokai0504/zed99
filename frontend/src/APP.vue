@@ -9,9 +9,7 @@
       </el-header>
 
       <el-main class="app-main">
-        <!-- ==================== 两个输入卡片行 ==================== -->
         <el-row :gutter="20" class="section-row">
-          <!-- 自然语言需求卡片 -->
           <el-col :xs="24" :md="12">
             <el-card shadow="hover" class="section-card input-card">
               <div slot="header" class="card-header">
@@ -47,7 +45,6 @@
             </el-card>
           </el-col>
 
-          <!-- 代码片段输入卡片 -->
           <el-col :xs="24" :md="12">
             <el-card shadow="hover" class="section-card input-card">
               <div slot="header" class="card-header">
@@ -83,7 +80,6 @@
           </el-col>
         </el-row>
 
-        <!-- 公共操作栏（导出 & 全局重置） -->
         <div class="global-actions">
           <el-button
             type="success"
@@ -113,9 +109,6 @@
           @close="message = ''"
         />
 
-        <!-- ==================== 结果展示区（完全保留原有内容） ==================== -->
-
-        <!-- 第二层：知识增强 + 结构化需求 -->
         <el-row :gutter="20" class="section-row">
           <el-col :xs="24" :md="12">
             <el-card shadow="hover" class="section-card fixed-card">
@@ -218,7 +211,6 @@
           </el-col>
         </el-row>
 
-        <!-- 第三层：故事列表 + 任务清单 -->
         <el-row :gutter="20" class="section-row">
           <el-col :xs="24" :md="12">
             <el-card shadow="hover" class="section-card content-card">
@@ -250,7 +242,6 @@
           </el-col>
         </el-row>
 
-        <!-- 第四层：用户故事相关代码生成 -->
         <el-card shadow="hover" class="section-card">
           <div slot="header" class="card-header">
             <span>用户故事相关代码生成</span>
@@ -307,7 +298,6 @@
           </div>
         </el-card>
 
-        <!-- 第五层：依赖图 -->
         <el-card shadow="hover" class="section-card graph-card">
           <div slot="header" class="card-header">
             <span>任务依赖关系图</span>
@@ -319,7 +309,6 @@
           />
         </el-card>
 
-        <!-- 第六层：实验评估体系 -->
         <el-card shadow="hover" class="section-card">
           <div slot="header" class="card-header">
             <span>实验评估体系</span>
@@ -403,19 +392,13 @@ export default {
   },
   data() {
     return {
-      // 两个输入框
       requirement: '',
       codeInput: '',
-
-      // 各自的 loading
       loadingRequirement: false,
       loadingCode: false,
       codeLoading: false,
-
       message: '',
       messageType: 'info',
-
-      // 共享结果
       knowledgeContext: '',
       structuredRequirement: {
         roles: [],
@@ -423,7 +406,6 @@ export default {
         conditions: [],
         goals: []
       },
-
       stories: [],
       tasks: [],
       selectedStory: '',
@@ -454,7 +436,6 @@ export default {
     }
   },
   methods: {
-    // ==================== 通用请求 ====================
     async request(url, method = 'GET', body = null) {
       const options = {
         method,
@@ -466,9 +447,11 @@ export default {
         options.body = JSON.stringify(body)
       }
 
-     const baseURL = process.env.VUE_APP_API_URL || ''
-    const response = await fetch(`${baseURL}${url}`, options)
-    const data = await response.json()
+      // 修正：从环境变量获取 baseURL
+      const baseURL = process.env.VUE_APP_API_URL || ''
+      const response = await fetch(`${baseURL}${url}`, options)
+      
+      const data = await response.json()
 
       if (!response.ok) {
         throw new Error(data.message || '请求失败')
@@ -484,7 +467,6 @@ export default {
       return data
     },
 
-    // 统一标准化后端返回
     normalizePayload(payload) {
       if (payload && payload.result) {
         return {
@@ -510,10 +492,8 @@ export default {
       }
     },
 
-    // 将标准化后的数据应用到页面
     applyResult(normalized) {
       const result = normalized.result || {}
-
       this.knowledgeContext = normalized.knowledge_context || ''
       this.structuredRequirement = result.structured_requirement || {
         roles: [],
@@ -526,17 +506,14 @@ export default {
       this.evaluation = normalized.evaluation || null
     },
 
-    // ==================== 从自然语言需求生成 ====================
     async generateFromRequirement() {
       const text = this.requirement.trim()
       if (!text) {
         this.showMessage('请输入自然语言需求', 'warning')
         return
       }
-
       this.loadingRequirement = true
       this.clearResults()
-
       try {
         let payload
         try {
@@ -548,14 +525,11 @@ export default {
             requirement: text
           })
         }
-
         const normalized = this.normalizePayload(payload)
         this.applyResult(normalized)
-
         if (!this.knowledgeContext) {
           await this.fetchContextPreview()
         }
-
         this.showMessage('生成成功，可选择一条用户故事继续生成相关代码', 'success')
       } catch (error) {
         this.clearResults()
@@ -565,43 +539,33 @@ export default {
       }
     },
 
-    // ==================== 从代码生成故事 ====================
-async generateFromCode() {
-  const code = this.codeInput.trim()
-  if (!code) {
-    this.showMessage('请粘贴代码片段', 'warning')
-    return
-  }
+    async generateFromCode() {
+      const code = this.codeInput.trim()
+      if (!code) {
+        this.showMessage('请粘贴代码片段', 'warning')
+        return
+      }
+      this.loadingCode = true
+      this.clearResults()
+      try {
+        const data = await this.request('/generate_story_from_code', 'POST', {
+          code: code
+        })
+        const normalized = {
+          knowledge_context: data.knowledge_context || '',
+          result: data.result || {},
+          evaluation: data.evaluation || null
+        }
+        this.applyResult(normalized)
+        this.showMessage('代码解析完成，已生成用户故事', 'success')
+      } catch (error) {
+        this.clearResults()
+        this.showMessage(error.message || '代码分析失败', 'error')
+      } finally {
+        this.loadingCode = false
+      }
+    },
 
-  this.loadingCode = true
-  this.clearResults()
-
-  try {
-    const data = await this.request('/generate_story_from_code', 'POST', {
-      code: code
-    })
-    // 现在后端会返回 evaluation
-    const normalized = {
-      knowledge_context: data.knowledge_context || '',
-      result: data.result || {},
-      evaluation: data.evaluation || null   //  使用返回的评估
-    }
-    this.applyResult(normalized)
-
-    if (!this.knowledgeContext) {
-      // 如果知识上下文为空可以不处理或尝试预览
-    }
-
-    this.showMessage('代码解析完成，已生成用户故事', 'success')
-  } catch (error) {
-    this.clearResults()
-    this.showMessage(error.message || '代码分析失败', 'error')
-  } finally {
-    this.loadingCode = false
-  }
-},
-
-    // 尝试获取知识增强上下文（用于自然语言模式）
     async fetchContextPreview() {
       try {
         const payload = await this.request('/preview_context', 'POST', {
@@ -613,26 +577,21 @@ async generateFromCode() {
       }
     },
 
-    // ==================== 根据选中故事生成相关代码 ====================
     async generateCodeByStory() {
       if (!this.selectedStory) {
         this.showMessage('请先选择一条用户故事', 'warning')
         return
       }
-
       const relatedTasks = this.tasks.filter(task => task.story === this.selectedStory)
-
       this.codeLoading = true
       this.generatedCode = null
       this.message = ''
-
       try {
         const payload = await this.request('/generate_code', 'POST', {
           requirement: this.requirement,
           story: this.selectedStory,
           tasks: relatedTasks
         })
-
         this.generatedCode = payload.code_result || null
         this.showMessage('相关代码生成成功', 'success')
       } catch (error) {
@@ -643,13 +602,11 @@ async generateFromCode() {
       }
     },
 
-    // ==================== 故事选中 ====================
     handleSelectStory(story) {
       this.selectedStory = story || ''
       this.generatedCode = null
     },
 
-    // ==================== 示例填充 ====================
     fillRequirementExample(type) {
       if (type === 'login') {
         this.requirement = '用户可以注册账号并登录系统查看个人信息，还可以上传头像，系统需要支持密码校验和登录失败提示。'
@@ -664,43 +621,13 @@ async generateFromCode() {
 
     fillCodeExample(type) {
       const examples = {
-        'login-api': `from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-
-app = FastAPI()
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-@app.post("/login")
-def login(req: LoginRequest):
-    # 模拟用户验证
-    if req.username != "admin" or req.password != "123456":
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
-    return {"token": "fake-jwt-token"}`,
-        'cart-api': `@app.post("/cart/add")
-def add_to_cart(item_id: int, quantity: int, user_id: int):
-    # 检查库存
-    stock = db.query(Item).filter(Item.id == item_id).first().stock
-    if stock < quantity:
-        raise HTTPException(status_code=400, detail="库存不足")
-    cart_item = CartItem(user_id=user_id, item_id=item_id, quantity=quantity)
-    db.add(cart_item)
-    db.commit()
-    return {"message": "加入购物车成功"}`,
-        'user-profile': `@app.get("/user/profile")
-def get_profile(current_user: User = Depends(get_current_user)):
-    return {
-        "username": current_user.username,
-        "email": current_user.email,
-        "avatar": current_user.avatar
-    }`
+        'login-api': `from fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel\n\napp = FastAPI()\n\nclass LoginRequest(BaseModel):\n    username: str\n    password: str\n\n@app.post("/login")\ndef login(req: LoginRequest):\n    if req.username != "admin" or req.password != "123456":\n        raise HTTPException(status_code=401, detail="用户名或密码错误")\n    return {"token": "fake-jwt-token"}`,
+        'cart-api': `@app.post("/cart/add")\ndef add_to_cart(item_id: int, quantity: int, user_id: int):\n    stock = db.query(Item).filter(Item.id == item_id).first().stock\n    if stock < quantity:\n        raise HTTPException(status_code=400, detail="库存不足")\n    cart_item = CartItem(user_id=user_id, item_id=item_id, quantity=quantity)\n    db.add(cart_item)\n    db.commit()\n    return {"message": "加入购物车成功"}`,
+        'user-profile': `@app.get("/user/profile")\ndef get_profile(current_user: User = Depends(get_current_user)):\n    return {\n        "username": current_user.username,\n        "email": current_user.email,\n        "avatar": current_user.avatar\n    }`
       }
       this.codeInput = examples[type] || ''
     },
 
-    // ==================== 清空 & 重置 ====================
     clearResults() {
       this.knowledgeContext = ''
       this.structuredRequirement = {
@@ -732,7 +659,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
       this.messageType = type
     },
 
-    // ==================== 辅助函数 ====================
     safeDimensionScore(key) {
       if (!this.evaluation || !this.evaluation.dimension_scores) {
         return 0
@@ -747,13 +673,10 @@ def get_profile(current_user: User = Depends(get_current_user)):
       return projectStructure.join('\n')
     },
 
-    // ==================== 导出 Markdown ====================
     exportMarkdown() {
       const lines = []
-
       lines.push('# 智能用户故事生成结果')
       lines.push('')
-
       lines.push('## 输入内容')
       lines.push('')
       if (this.requirement) {
@@ -770,14 +693,12 @@ def get_profile(current_user: User = Depends(get_current_user)):
         lines.push('```')
         lines.push('')
       }
-
       lines.push('## 知识增强上下文')
       lines.push('')
       lines.push('```')
       lines.push(this.knowledgeContext || '无')
       lines.push('```')
       lines.push('')
-
       lines.push('## 结构化需求表示')
       lines.push('')
       lines.push(`- 角色：${(this.structuredRequirement.roles || []).join('、') || '无'}`)
@@ -785,7 +706,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
       lines.push(`- 条件：${(this.structuredRequirement.conditions || []).join('、') || '无'}`)
       lines.push(`- 目标：${(this.structuredRequirement.goals || []).join('、') || '无'}`)
       lines.push('')
-
       lines.push('## 用户故事列表')
       lines.push('')
       if (this.stories.length) {
@@ -796,7 +716,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
         lines.push('无')
       }
       lines.push('')
-
       lines.push('## 任务清单')
       lines.push('')
       if (this.tasks.length) {
@@ -811,7 +730,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
         lines.push('无')
       }
       lines.push('')
-
       lines.push('## 用户故事相关代码生成')
       lines.push('')
       if (this.generatedCode) {
@@ -849,7 +767,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
         lines.push('未生成相关代码')
       }
       lines.push('')
-
       lines.push('## 实验评估体系')
       lines.push('')
       if (this.evaluation) {
@@ -871,7 +788,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
       } else {
         lines.push('无')
       }
-
       const content = lines.join('\n')
       const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -890,57 +806,46 @@ def get_profile(current_user: User = Depends(get_current_user)):
   min-height: 100vh;
   background: #f5f7fa;
 }
-
 .app-header {
   height: auto !important;
   padding: 24px 20px 16px;
   background: linear-gradient(135deg, #409eff, #67c23a);
   color: #fff;
 }
-
 .header-title {
   font-size: 28px;
   font-weight: 700;
   margin-bottom: 8px;
 }
-
 .header-subtitle {
   font-size: 14px;
   opacity: 0.95;
 }
-
 .app-main {
   padding: 20px;
 }
-
 .section-card {
   margin-bottom: 20px;
   border-radius: 12px;
 }
-
 .input-card {
   min-height: 340px;
 }
-
 .fixed-card {
   min-height: 320px;
 }
-
 .content-card {
   min-height: 520px;
 }
-
 .graph-card {
   min-height: 560px;
 }
-
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
 }
-
 .action-bar {
   margin-top: 16px;
   display: flex;
@@ -948,7 +853,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
   flex-wrap: wrap;
   align-items: center;
 }
-
 .demo-bar {
   margin-top: 14px;
   display: flex;
@@ -956,22 +860,18 @@ def get_profile(current_user: User = Depends(get_current_user)):
   gap: 8px;
   align-items: center;
 }
-
 .demo-label {
   font-size: 13px;
   color: #606266;
 }
-
 .global-actions {
   margin-bottom: 20px;
   display: flex;
   gap: 12px;
 }
-
 .section-alert {
   margin-bottom: 20px;
 }
-
 .context-box {
   background: #fafafa;
   border: 1px solid #ebeef5;
@@ -979,7 +879,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
   padding: 12px;
   min-height: 220px;
 }
-
 .context-box pre,
 .code-result-wrapper pre {
   margin: 0;
@@ -989,7 +888,6 @@ def get_profile(current_user: User = Depends(get_current_user)):
   font-size: 13px;
   color: #606266;
 }
-
 .code-result-wrapper pre {
   background: #f8f8f8;
   border-radius: 8px;
@@ -997,42 +895,35 @@ def get_profile(current_user: User = Depends(get_current_user)):
   max-height: 520px;
   overflow-y: auto;
 }
-
 .structured-wrapper {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-
 .structured-group {
   border: 1px solid #ebeef5;
   border-radius: 8px;
   padding: 12px;
   background: #fafafa;
 }
-
 .structured-label {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
   margin-bottom: 10px;
 }
-
 .tag-group {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-
 .tag-item {
   margin-right: 0;
 }
-
 .empty-text {
   color: #909399;
   font-size: 13px;
 }
-
 .selected-story-box {
   padding: 12px;
   background: #f5f7fa;
@@ -1041,18 +932,15 @@ def get_profile(current_user: User = Depends(get_current_user)):
   line-height: 1.8;
   color: #303133;
 }
-
 .code-result-wrapper {
   margin-top: 16px;
 }
-
 .note-list {
   margin: 0;
   padding-left: 20px;
   line-height: 1.9;
   color: #606266;
 }
-
 .score-box,
 .score-summary {
   background: #fafafa;
@@ -1061,54 +949,44 @@ def get_profile(current_user: User = Depends(get_current_user)):
   padding: 16px;
   min-height: 120px;
 }
-
 .score-title {
   font-size: 14px;
   font-weight: 600;
   color: #303133;
   margin-bottom: 10px;
 }
-
 .score-value {
   font-size: 42px;
   font-weight: 700;
   color: #409EFF;
   line-height: 1;
 }
-
 .score-text {
   font-size: 14px;
   color: #606266;
   line-height: 1.8;
 }
-
 .inner-card {
   min-height: 180px;
 }
-
 .suggestion-tag {
   margin-right: 8px;
   margin-bottom: 8px;
 }
-
 @media (max-width: 768px) {
   .header-title {
     font-size: 22px;
   }
-
   .app-main {
     padding: 12px;
   }
-
   .global-actions {
     flex-direction: column;
   }
-
   .action-bar {
     flex-direction: column;
     align-items: stretch;
   }
-
   .demo-bar {
     flex-direction: column;
     align-items: flex-start;

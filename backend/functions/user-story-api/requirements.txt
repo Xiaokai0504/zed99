@@ -4,6 +4,6 @@ gunicorn
 openai
 pandas
 python-dotenv
-sqlalchemy
-psycopg2-binary
 python-multipart
+mangum>=0.17.0
+sqlalchemy>=2.0.0
