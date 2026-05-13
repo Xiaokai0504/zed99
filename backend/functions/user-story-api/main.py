@@ -3,7 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import json
 from typing import Any, Dict, List
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from llm_module import generate_structured_data, extract_requirement_from_code
@@ -22,9 +22,10 @@ except Exception:
 app = FastAPI(
     title="智能用户故事生成系统（无数据库版）",
     description="基于大语言模型的需求解析、用户故事生成、任务拆解、代码生成与实验评估系统",
-    version="2.0.0",
-    root_path="/api"  # <--- 必须保留或加回这一行
+    version="2.0.0"
 )
+
+api_router = APIRouter()
 
 # 配置CORS
 app.add_middleware(
@@ -62,7 +63,7 @@ def error_response(message: str = "操作失败", data: Any = None) -> Dict[str,
         "data": data
     }
 
-@app.get("/health")
+@api_router.get("/health")
 def health_check():
     return success_response(
         {
@@ -74,7 +75,7 @@ def health_check():
         "服务运行正常"
     )
 
-@app.post("/preview_context")
+@api_router.post("/preview_context")
 def preview_context(req: RequirementRequest):
     requirement = req.requirement.strip()
     if not requirement:
@@ -91,7 +92,7 @@ def preview_context(req: RequirementRequest):
     except Exception as e:
         return error_response(f"知识增强处理异常: {str(e)}")
 
-@app.post("/generate_story")
+@api_router.post("/generate_story")
 def generate_story_endpoint(req: RequirementRequest):
     requirement = req.requirement.strip()
     if not requirement:
@@ -119,7 +120,7 @@ def generate_story_endpoint(req: RequirementRequest):
     except Exception as e:
         return error_response(f"后端处理异常: {str(e)}")
 
-@app.post("/generate_batch")
+@api_router.post("/generate_batch")
 def generate_batch_endpoint(req: BatchRequirementRequest):
     requirements = [
         item.strip()
@@ -167,7 +168,7 @@ def generate_batch_endpoint(req: BatchRequirementRequest):
         "批量用户故事生成完成"
     )
 
-@app.post("/generate_and_evaluate")
+@api_router.post("/generate_and_evaluate")
 def generate_and_evaluate(req: RequirementRequest):
     requirement = req.requirement.strip()
     if not requirement:
@@ -198,7 +199,7 @@ def generate_and_evaluate(req: RequirementRequest):
     except Exception as e:
         return error_response(f"后端处理异常: {str(e)}")
 
-@app.post("/generate_story_from_code")
+@api_router.post("/generate_story_from_code")
 def generate_story_from_code(req: CodeRequirementRequest):
     code = req.code.strip()
     if not code:
@@ -232,7 +233,7 @@ def generate_story_from_code(req: CodeRequirementRequest):
     except Exception as e:
         return error_response(f"代码分析异常: {str(e)}")
 
-@app.post("/generate_code")
+@api_router.post("/generate_code")
 def generate_code_endpoint(req: CodeGenerateRequest):
     if not CODE_GENERATION_AVAILABLE:
         return error_response("代码生成模块未启用，请检查 code_module.py 是否存在并能正常导入")
@@ -264,6 +265,9 @@ def generate_code_endpoint(req: CodeGenerateRequest):
         )
     except Exception as e:
         return error_response(f"代码生成接口异常: {str(e)}")
+
+app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
 
 # CloudBase云函数入口
 def handler(event, context):

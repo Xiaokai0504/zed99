@@ -19,14 +19,14 @@ The actual FastAPI app entry is:
 The container starts the service with the following command:
 
 ```sh
-uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+uvicorn main:app --host 0.0.0.0 --port ${PORT:-80}
 ```
 
 This means:
 
 - CloudBase must expose or inject the `PORT` environment variable
 - The service listens on `0.0.0.0`
-- The default internal port is `8000`
+- The default internal port is `80`
 
 ## Files already prepared
 
@@ -72,7 +72,7 @@ Dockerfile
 Set the service port to:
 
 ```text
-8000
+80
 ```
 
 If CloudBase automatically injects `PORT`, the current Dockerfile can use it directly.
@@ -91,7 +91,7 @@ Optional variables if you want to keep them:
 
 ```text
 DEBUG=true
-API_PORT=8000
+API_PORT=80
 API_HOST=0.0.0.0
 ```
 
@@ -99,21 +99,25 @@ In practice, the key variable is `DEEPSEEK_API_KEY`.
 
 ## Suggested routing
 
-Your FastAPI app currently defines `root_path="/api"` in `functions/user-story-api/main.py`.
+Your FastAPI app exposes the same endpoints both at the root path and under `/api`.
 
-That means the cleanest deployment approach is to configure CloudBase routing so that the service is mounted under:
+That means you can either call the service directly at the root path, or keep using an `/api` prefix from the frontend:
 
 ```text
 /api
 ```
 
-Then your health check path will usually be:
+The internal health check path should use the real route path:
+
+```text
+/health
+```
+
+The external access path can still be:
 
 ```text
 /api/health
 ```
-
-If you want to deploy directly at the domain root instead of `/api`, you may need to remove or adjust `root_path` later.
 
 ## Local validation before upload
 
@@ -128,7 +132,7 @@ docker build -t user-story-api .
 ### Run container
 
 ```sh
-docker run --rm -p 8000:8000 -e DEEPSEEK_API_KEY=your_real_key user-story-api
+docker run --rm -p 8000:80 -e DEEPSEEK_API_KEY=your_real_key user-story-api
 ```
 
 ### Test health endpoint
@@ -169,10 +173,10 @@ user_story_api
 
 - Docker build context is `backend`
 - Dockerfile path is `backend/Dockerfile`
-- Service port is `8000`
+- Service port is `80`
 - CloudBase environment variable `DEEPSEEK_API_KEY` is set
 - `.env` is not uploaded into the image
-- Routing is configured consistently with `/api` if you keep `root_path="/api"`
+- Frontend can use either root routes or `/api` routes
 
 ## Troubleshooting
 
@@ -180,9 +184,9 @@ user_story_api
 
 Possible cause:
 
-- CloudBase route prefix does not match the app `root_path`
+- Frontend or gateway is calling a different path variant than the backend exposes
 
-Check whether you are visiting `/health` or `/api/health`.
+Check whether you are visiting `/health` or `/api/health`. Both are supported now.
 
 ### Container starts but model calls fail
 
@@ -196,4 +200,4 @@ Possible cause:
 
 - The platform is not using the backend directory as the Docker build context
 - The Dockerfile path is incorrect
-- The service port is not mapped to `8000`
+- The service port is not mapped to `80`

@@ -5,7 +5,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=8000
+    PORT=80
 
 COPY functions/user-story-api/requirements.txt ./requirements.txt
 
@@ -14,6 +14,6 @@ RUN pip install --upgrade pip && \
 
 COPY functions/user-story-api/ .
 
-EXPOSE 8000
+EXPOSE 80
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-80}"]
